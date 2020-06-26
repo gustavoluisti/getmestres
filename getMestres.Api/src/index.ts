@@ -5,10 +5,12 @@ import * as bodyParser from "body-parser";
 import { Request, Response } from "express";
 import { Routes } from "./routes";
 import config from "./config/config";
+import auth from "./middleware/auth";
 
 // create express app
 const app = express();
 app.use(bodyParser.json());
+app.use(auth);
 
 // register express routes from defined application routes
 Routes.forEach((route) => {
@@ -21,9 +23,14 @@ Routes.forEach((route) => {
         next
       );
       if (result instanceof Promise) {
-        result.then((result) =>
-          result !== null && result !== undefined ? res.send(result) : undefined
-        );
+        // result.then((result) =>
+        //   result !== null && result !== undefined ? res.send(result) : undefined
+        // );
+
+        result.then((d) => {
+          if (d && d.status) res.status(d.status).send(d.message || d.errors);
+          else res.json(d);
+        });
       } else if (result !== null && result !== undefined) {
         res.json(result);
       }

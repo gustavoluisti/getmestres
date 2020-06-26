@@ -1,10 +1,49 @@
 import { Request } from "express";
 import { User } from "../entity/User";
 import { BaseController } from "./BaseController";
+import { sign } from "jsonwebtoken";
+import config from "../config/config";
+import * as md5 from "md5";
 
 export class UserController extends BaseController<User> {
   constructor() {
     super(User);
+  }
+
+  async auth(request: Request) {
+    let { email, password } = request.body;
+    if (!email || !password)
+      return {
+        status: 400,
+        message: "Informe o email e a senha para efetuar o login",
+      };
+    let user = await this.repository.findOne({
+      email: email,
+      password: md5(password),
+    });
+    if (user) {
+      let _payload = {
+        uid: user.uid,
+        name: user.name,
+        photo: user.photo,
+        email: user.email,
+      };
+      return {
+        status: 200,
+        message: {
+          user: _payload,
+          token: sign(
+            {
+              ..._payload,
+              tm: new Date().getTime(),
+            },
+            config.secretyKey
+          ),
+        },
+      };
+    } else {
+      return { status: 404, message: "E-amil ou senha inválidos" };
+    }
   }
 
   async createUser(request: Request) {
@@ -26,7 +65,13 @@ export class UserController extends BaseController<User> {
     _user.name = name;
     _user.photo = photo;
     _user.email = email;
-    _user.password = password;
+    if (password !== confirmPassword)
+      return {
+        status: 400,
+        errors: ["A senha e sua confirmação são diferentes"],
+      };
+
+    if (password) _user.password = md5(password);
     _user.isRoot = isRoot;
 
     return super.save(_user);
